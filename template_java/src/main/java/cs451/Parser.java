@@ -70,4 +70,11 @@ public class Parser {
         return configParser.getPath();
     }
 
+    public int messageNumber() {
+        return configParser.getMessageNumber();
+    }
+
+    public int receiverId() {
+        return configParser.getReceiverId();
+    }
 }
