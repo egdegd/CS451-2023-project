@@ -1,9 +1,10 @@
 package cs451;
 
+import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-public class Host {
+public class Host implements Serializable {
 
     private static final String IP_START_REGEX = "/";
 

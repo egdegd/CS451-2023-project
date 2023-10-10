@@ -1,29 +1,44 @@
 package cs451;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Objects;
 
 public class Main {
+    private static ProcessManager processManager;
+    private static Parser parser;
 
-    private static void handleSignal() {
+    private static void handleSignal() throws IOException {
         //immediately stop network packet processing
         System.out.println("Immediately stopping network packet processing.");
 
         //write/flush output file if necessary
         System.out.println("Writing output.");
+        BufferedWriter writer = new BufferedWriter(new FileWriter(parser.output()));
+        synchronized (processManager.getLogs()) {
+            for (String log : processManager.getLogs()) {
+                writer.write(log + '\n');
+            }
+        }
+        writer.close();
     }
 
     private static void initSignalHandlers() {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                handleSignal();
+                try {
+                    handleSignal();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         });
     }
 
-    public static void main(String[] args) throws InterruptedException, IOException {
-        Parser parser = new Parser(args);
+    public static void main(String[] args) throws InterruptedException, IOException, ClassNotFoundException {
+        parser = new Parser(args);
         parser.parse();
 
         initSignalHandlers();
@@ -55,19 +70,18 @@ public class Main {
 
 
         System.out.println("Doing some initialization\n");
+        Host curHost = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.myId()).findAny().orElse(null));
+        processManager = new ProcessManager(curHost);
 
         System.out.println("Broadcasting and delivering messages...\n");
-        int receiverPort = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.receiverId()).findAny().orElse(null)).getPort();
+        Host receiverHost = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.receiverId()).findAny().orElse(null));
+
         if (parser.myId() == parser.receiverId()) {
             System.out.println("receiver\n");
-            UDPReceiver server = new UDPReceiver(receiverPort);
-            server.listen();
         } else {
             System.out.println("sender\n");
-            UDPSender client = new UDPSender();
-            for (int i = 1; i <= parser.messageNumber(); i++) {
-                client.send(Integer.toString(i), receiverPort);
-                client.clientSocket.setSoTimeout(5000);
+            for (int i = 1; i < parser.messageNumber() + 1; i++) {
+                processManager.PLSend(new Message(Integer.toString(i), curHost, receiverHost));
             }
         }
 

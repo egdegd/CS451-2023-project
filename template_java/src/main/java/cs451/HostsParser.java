@@ -14,7 +14,7 @@ public class HostsParser {
     private static final String SPACES_REGEX = "\\s+";
 
     private String filename;
-    private List<Host> hosts = new ArrayList<>();
+    private List<Host> Hosts = new ArrayList<>();
 
     public boolean populate(String key, String filename) {
         if (!key.equals(HOSTS_KEY)) {
@@ -40,7 +40,7 @@ public class HostsParser {
                     return false;
                 }
 
-                hosts.add(newHost);
+                Hosts.add(newHost);
             }
         } catch (IOException e) {
             System.err.println("Problem with the hosts file!");
@@ -53,13 +53,13 @@ public class HostsParser {
         }
 
         // sort by id
-        Collections.sort(hosts, new HostsComparator());
+        Collections.sort(Hosts, new HostsComparator());
         return true;
     }
 
     private boolean checkIdRange() {
-        int num = hosts.size();
-        for (Host host : hosts) {
+        int num = Hosts.size();
+        for (Host host : Hosts) {
             if (host.getId() < 1 || host.getId() > num) {
                 System.err.println("Id of a host is not in the right range!");
                 return false;
@@ -70,11 +70,11 @@ public class HostsParser {
     }
 
     public boolean inRange(int id) {
-        return id <= hosts.size();
+        return id <= Hosts.size();
     }
 
     public List<Host> getHosts() {
-        return hosts;
+        return Hosts;
     }
 
     class HostsComparator implements Comparator<Host> {
