@@ -3,6 +3,7 @@ package cs451;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Base64;
 
 public class UDPReceiver extends Thread{
     private final DatagramSocket serverSocket;
@@ -17,7 +18,7 @@ public class UDPReceiver extends Thread{
     public void run() {
         System.out.println("Server Started. Listening for Clients on port " + port + "...");
         while (true) {
-            byte[] receiveData = new byte[1024];
+            byte[] receiveData = new byte[10000];
             // Server waiting for clients message
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             try {
@@ -33,16 +34,27 @@ public class UDPReceiver extends Thread{
             if (message.isAck) {
                 processManager.deleteMessageFromStubbornList(Integer.parseInt(message.getText()));
             } else {
-                try {
-                    processManager.send(new Message(true, message.getMessageID(), processManager.getHost(), message.getSender()));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                for (String stringMessage: message.getText().split("&&")) {
+                    try {
+                        Message oneMessage = deserializeMessageFromString(stringMessage);
+                        processManager.send(new Message(true, oneMessage.getMessageID(), processManager.getHost(), oneMessage.getSender()));
+                        if (!delivered.contains(oneMessage)) {
+                            delivered.add(oneMessage);
+                            processManager.deliver(oneMessage);
+                        }
+                    } catch (IOException | ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
-                if (!delivered.contains(message)) {
-                    delivered.add(message);
-                    processManager.deliver(message);
-                }
-
+//                try {
+//                    processManager.send(new Message(true, message.getMessageID(), processManager.getHost(), message.getSender()));
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//                if (!delivered.contains(message)) {
+//                    delivered.add(message);
+//                    processManager.deliver(message);
+//                }
             }
             // Print the message with log header
 //            System.out.println("[" + " ,IP: " + IPAddress + " ,Port: " + port +"]  " + message.getText() + " " + message.isAck + " " +  message.getMessageID());
@@ -64,5 +76,13 @@ public class UDPReceiver extends Thread{
             throw new RuntimeException(e);
         }
         return message;
+    }
+    private Message deserializeMessageFromString(String stringMessage) throws IOException, ClassNotFoundException {
+        byte [] data = Base64.getDecoder().decode(stringMessage);
+        ObjectInputStream ois = new ObjectInputStream(
+                new ByteArrayInputStream(  data ) );
+        Message m  = (Message) ois.readObject();
+        ois.close();
+        return m;
     }
 }
