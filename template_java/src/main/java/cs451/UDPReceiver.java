@@ -28,7 +28,6 @@ public class UDPReceiver extends Thread{
             }
             // Get the client's IP address and port
             InetAddress IPAddress = receivePacket.getAddress();
-            int port = receivePacket.getPort();
             // Convert Byte Data to String
             Message message = deserializeMessage(receivePacket.getData());
             if (message.isAck) {
@@ -46,18 +45,7 @@ public class UDPReceiver extends Thread{
                         throw new RuntimeException(e);
                     }
                 }
-//                try {
-//                    processManager.send(new Message(true, message.getMessageID(), processManager.getHost(), message.getSender()));
-//                } catch (IOException e) {
-//                    throw new RuntimeException(e);
-//                }
-//                if (!delivered.contains(message)) {
-//                    delivered.add(message);
-//                    processManager.deliver(message);
-//                }
             }
-            // Print the message with log header
-//            System.out.println("[" + " ,IP: " + IPAddress + " ,Port: " + port +"]  " + message.getText() + " " + message.isAck + " " +  message.getMessageID());
         }
     }
 

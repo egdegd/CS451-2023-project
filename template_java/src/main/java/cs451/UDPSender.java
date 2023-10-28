@@ -17,7 +17,7 @@ public class UDPSender extends Thread{
         while (true) {
             combineMessagesByReceiver();
             try {
-                sendBatch(5);
+                sendBatch(8);
             } catch (IOException | ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
@@ -26,7 +26,6 @@ public class UDPSender extends Thread{
 
     private void sendBatch(int batchSize) throws IOException, ClassNotFoundException {
         for (int id : messagesByReceiver.keySet()) {
-//            System.out.println(messagesByReceiver.get(id).size());
             LinkedList<Message> ms = messagesByReceiver.get(id);
             StringBuilder concatMessages = new StringBuilder();
             concatMessages.setLength(0);
@@ -36,7 +35,6 @@ public class UDPSender extends Thread{
                 Host receiverHost = ms.getFirst().getReceiver();
                 Host senderHost = ms.getFirst().getSender();
                 if (curBatchSize == batchSize) {
-//                    System.out.println(concatMessages.toString());
                     Message m = new Message(concatMessages.toString(), senderHost, receiverHost);
                     try {
                         send(m);
@@ -84,10 +82,8 @@ public class UDPSender extends Thread{
                     messagesByReceiver.put(m.getReceiver().getId(), new LinkedList<>());
                 }
                 messagesByReceiver.get(m.getReceiver().getId()).add(m);
-//                System.out.println(messagesByReceiver.size());
             }
         }
-//        System.out.println(messagesByReceiver.size() + " " + StubbornMessages.size());
     }
 
     public void addMessageToList(Message m) {
