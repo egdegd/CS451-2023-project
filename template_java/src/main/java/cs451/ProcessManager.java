@@ -24,7 +24,7 @@ public class ProcessManager {
         sender.start();
     }
 
-    public void PLSend(Message m) throws IOException {
+    public void PLSend(Message m) {
         sender.addMessageToList(m);
         synchronized (logs) {
             logs.add("b " + m.getText());

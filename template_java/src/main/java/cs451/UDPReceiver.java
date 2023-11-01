@@ -37,19 +37,21 @@ public class UDPReceiver extends Thread{
 
             String[] splitMessage = messageText.split("&&");
             if (Objects.equals(splitMessage[0], "is_ack")) {
-                Message oneMessage = new Message(splitMessage[1], processManager.getHost(), processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()));
-                processManager.deleteMessageFromStubbornList(oneMessage);
+                for (int i = 1; i < splitMessage.length; i++) {
+                    Message oneMessage = new Message(splitMessage[i], processManager.getHost(), processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()));
+                    processManager.deleteMessageFromStubbornList(oneMessage);
+                }
             } else {
+                try {
+                    processManager.send(true, new Message(messageText, processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()), processManager.getHost()));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
                 for (String textMessage: splitMessage) {
                     Message oneMessage = new Message(textMessage, processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()), processManager.getHost());
-                    try {
-                        processManager.send(true, oneMessage);
-                        if (!delivered.contains(oneMessage)) {
-                            delivered.add(oneMessage);
-                            processManager.deliver(oneMessage);
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+                    if (!delivered.contains(oneMessage)) {
+                        delivered.add(oneMessage);
+                        processManager.deliver(oneMessage);
                     }
                 }
             }

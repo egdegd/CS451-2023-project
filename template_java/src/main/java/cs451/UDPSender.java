@@ -92,6 +92,6 @@ public class UDPSender extends Thread{
         byte[] sendData = messageText.getBytes();
         DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(receiverIp), receiverPort);
         clientSocket.send(sendPacket);
-        System.out.println("SEND " +messageText + " " + receiverPort);
+//        System.out.println("SEND " +messageText + " " + receiverPort);
     }
 }
