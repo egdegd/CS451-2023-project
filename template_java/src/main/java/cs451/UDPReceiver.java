@@ -4,21 +4,22 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Objects;
 
 public class UDPReceiver extends Thread{
     private final DatagramSocket serverSocket;
     private final ProcessManager processManager;
     private final ArrayList<Message> delivered = new ArrayList<>();
     int port;
-    public UDPReceiver(int port, ProcessManager processManager) throws IOException {
-        serverSocket = new DatagramSocket(port);
+    public UDPReceiver(int port, DatagramSocket socket, ProcessManager processManager) throws IOException {
+        serverSocket = socket;
         this.port = port;
         this.processManager = processManager;
     }
     public void run() {
         System.out.println("Server Started. Listening for Clients on port " + port + "...");
         while (true) {
-            byte[] receiveData = new byte[10000];
+            byte[] receiveData = new byte[1024];
             // Server waiting for clients message
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             try {
@@ -27,21 +28,27 @@ public class UDPReceiver extends Thread{
                 throw new RuntimeException(e);
             }
             // Get the client's IP address and port
-            InetAddress IPAddress = receivePacket.getAddress();
+            String IPAddress = receivePacket.getAddress().toString();
+            if (IPAddress.startsWith("/")) {
+                IPAddress = IPAddress.substring(1);
+            }
             // Convert Byte Data to String
-            Message message = deserializeMessage(receivePacket.getData());
-            if (message.isAck) {
-                processManager.deleteMessageFromStubbornList(Integer.parseInt(message.getText()));
+            String messageText = new String(receivePacket.getData(), 0, receivePacket.getLength());
+
+            String[] splitMessage = messageText.split("&&");
+            if (Objects.equals(splitMessage[0], "is_ack")) {
+                Message oneMessage = new Message(splitMessage[1], processManager.getHost(), processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()));
+                processManager.deleteMessageFromStubbornList(oneMessage);
             } else {
-                for (String stringMessage: message.getText().split("&&")) {
+                for (String textMessage: splitMessage) {
+                    Message oneMessage = new Message(textMessage, processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()), processManager.getHost());
                     try {
-                        Message oneMessage = deserializeMessageFromString(stringMessage);
-                        processManager.send(new Message(true, oneMessage.getMessageID(), processManager.getHost(), oneMessage.getSender()));
+                        processManager.send(true, oneMessage);
                         if (!delivered.contains(oneMessage)) {
                             delivered.add(oneMessage);
                             processManager.deliver(oneMessage);
                         }
-                    } catch (IOException | ClassNotFoundException e) {
+                    } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
                 }
@@ -49,28 +56,4 @@ public class UDPReceiver extends Thread{
         }
     }
 
-    private Message deserializeMessage(byte[] data) {
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        ObjectInputStream is = null;
-        try {
-            is = new ObjectInputStream(in);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        Message message = null;
-        try {
-            message = (Message) is.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-        return message;
-    }
-    private Message deserializeMessageFromString(String stringMessage) throws IOException, ClassNotFoundException {
-        byte [] data = Base64.getDecoder().decode(stringMessage);
-        ObjectInputStream ois = new ObjectInputStream(
-                new ByteArrayInputStream(  data ) );
-        Message m  = (Message) ois.readObject();
-        ois.close();
-        return m;
-    }
 }

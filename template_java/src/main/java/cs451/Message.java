@@ -2,24 +2,19 @@ package cs451;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Message implements Serializable {
     private final Host sender;
     private final Host receiver;
     private final String text;
 
-    private static final AtomicInteger count = new AtomicInteger(0);
-
-    private final int messageID;
 
     boolean isAck = false;
 
-    public Message(String content, Host sender, Host receiver) {
-        this.text = content;
+    public Message(String text, Host sender, Host receiver) {
+        this.text = text;
         this.sender = sender;
         this.receiver = receiver;
-        messageID = count.incrementAndGet();
     }
 
     public Message(boolean isAck, int messageId, Host sender, Host receiver){
@@ -27,7 +22,6 @@ public class Message implements Serializable {
         this.receiver = receiver;
         this.isAck = isAck;
         text = Integer.toString(messageId);
-        messageID = count.incrementAndGet();
     }
 
     public Host getReceiver() {
@@ -42,9 +36,6 @@ public class Message implements Serializable {
         return text;
     }
 
-    public int getMessageID() {
-        return messageID;
-    }
     public boolean equals(Object o) {
         if (o == this) {
             return true;
@@ -53,8 +44,9 @@ public class Message implements Serializable {
             return false;
         }
         Message m = (Message) o;
-        return messageID == m.getMessageID()
-                && sender.getId() == m.getSender().getId()
+        return
+                Objects.equals(text, m.getText()) &&
+                sender.getId() == m.getSender().getId()
                 && receiver.getId() == m.getReceiver().getId();
     }
 }

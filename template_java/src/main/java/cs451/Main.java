@@ -71,7 +71,7 @@ public class Main {
 
         System.out.println("Doing some initialization\n");
         Host curHost = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.myId()).findAny().orElse(null));
-        processManager = new ProcessManager(curHost);
+        processManager = new ProcessManager(curHost, parser.hosts());
 
         System.out.println("Broadcasting and delivering messages...\n");
         Host receiverHost = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.receiverId()).findAny().orElse(null));
