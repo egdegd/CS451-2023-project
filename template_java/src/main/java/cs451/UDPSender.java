@@ -8,9 +8,11 @@ public class UDPSender extends Thread{
     private final DatagramSocket clientSocket;
     private final List<Message> StubbornMessages = Collections.synchronizedList(new ArrayList<>());
     private final Map<Integer, LinkedList<Message>> messagesByReceiver = new HashMap<>();
-    public UDPSender(DatagramSocket socket) {
+    private final ProcessManager processManager;
+    public UDPSender(DatagramSocket socket, ProcessManager processManager) {
         // Create a Datagram Socket
         clientSocket = socket;
+        this.processManager = processManager;
     }
 
     public void run() {
@@ -36,7 +38,7 @@ public class UDPSender extends Thread{
                 receiverHost = ms.getFirst().getReceiver();
                 if (curBatchSize == batchSize) {
                     try {
-                        send(concatMessages.toString(),receiverHost.getIp(), receiverHost.getPort());
+                        UdpSend(concatMessages.toString(),receiverHost.getIp(), receiverHost.getPort());
                         batchnumber += 1;
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -59,7 +61,7 @@ public class UDPSender extends Thread{
             if (concatMessages.length() > 0) {
                 try {
                     assert receiverHost != null;
-                    send(concatMessages.toString(), receiverHost.getIp(), receiverHost.getPort());
+                    UdpSend(concatMessages.toString(), receiverHost.getIp(), receiverHost.getPort());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -78,7 +80,7 @@ public class UDPSender extends Thread{
         }
     }
 
-    public void addMessageToList(Message m) {
+    public void addMessageToStubbornList(Message m) {
         synchronized (StubbornMessages) {
             StubbornMessages.add(m);
         }
@@ -88,10 +90,17 @@ public class UDPSender extends Thread{
             StubbornMessages.remove(message);
         }
     }
-    public void send(String messageText, String receiverIp, int receiverPort) throws IOException {
+    public void UdpSend(String messageText, String receiverIp, int receiverPort) throws IOException {
         byte[] sendData = messageText.getBytes();
         DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, InetAddress.getByName(receiverIp), receiverPort);
         clientSocket.send(sendPacket);
-//        System.out.println("SEND " +messageText + " " + receiverPort);
+        System.out.println("SEND " + messageText + " " + receiverPort);
     }
+
+//    public void bestEffortBroadCast(Message m) {
+//        String text = m.getSender().getId() + "$" + m.getText();
+//        for (Host host: processManager.getHostsList()) {
+//
+//        }
+//    }
 }

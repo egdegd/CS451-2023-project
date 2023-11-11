@@ -10,7 +10,7 @@ public class ConfigParser {
     private static final String SPACES_REGEX = "\\s+";
     private String path;
     private int messageNumber;
-    private int receiverId;
+//    private int receiverId;
 
     public boolean populate(String value) {
         File file = new File(value);
@@ -18,13 +18,13 @@ public class ConfigParser {
         try(BufferedReader br = new BufferedReader(new FileReader(file))) {
             String line = br.readLine();
             String[] splits = line.split(SPACES_REGEX);
-            if (splits.length != 2) {
-                System.err.println("The config file must consist of 2 integers!");
+            if (splits.length != 1) {
+                System.err.println("The config file must consist of 1 integers!");
                 return false;
             }
             try {
                 messageNumber = Integer.parseInt(splits[0]);
-                receiverId = Integer.parseInt(splits[1]);
+//                receiverId = Integer.parseInt(splits[1]);
             } catch (NumberFormatException e) {
                 System.err.println("The config file must consist of 2 integers!");
                 return false;
@@ -43,8 +43,8 @@ public class ConfigParser {
     public int getMessageNumber() {
         return messageNumber;
     }
-    public int getReceiverId() {
-        return receiverId;
-    }
+//    public int getReceiverId() {
+//        return receiverId;
+//    }
 
 }

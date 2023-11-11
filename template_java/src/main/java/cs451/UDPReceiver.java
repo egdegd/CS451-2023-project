@@ -2,14 +2,13 @@ package cs451;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Objects;
+import java.util.*;
 
 public class UDPReceiver extends Thread{
     private final DatagramSocket serverSocket;
     private final ProcessManager processManager;
-    private final ArrayList<Message> delivered = new ArrayList<>();
+    private final ArrayList<LightMessage> urbDelivered = new ArrayList<>();
+    private Map<LightMessage, Set<Integer>> urbMessages = new HashMap<>();
     int port;
     public UDPReceiver(int port, DatagramSocket socket, ProcessManager processManager) throws IOException {
         serverSocket = socket;
@@ -34,7 +33,6 @@ public class UDPReceiver extends Thread{
             }
             // Convert Byte Data to String
             String messageText = new String(receivePacket.getData(), 0, receivePacket.getLength());
-
             String[] splitMessage = messageText.split("&&");
             if (Objects.equals(splitMessage[0], "is_ack")) {
                 for (int i = 1; i < splitMessage.length; i++) {
@@ -48,10 +46,17 @@ public class UDPReceiver extends Thread{
                     throw new RuntimeException(e);
                 }
                 for (String textMessage: splitMessage) {
-                    Message oneMessage = new Message(textMessage, processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()), processManager.getHost());
-                    if (!delivered.contains(oneMessage)) {
-                        delivered.add(oneMessage);
-                        processManager.deliver(oneMessage);
+                    String[] messageInfo = textMessage.split("@@");
+                    LightMessage oneLightMessage = new LightMessage(Integer.parseInt(messageInfo[0]), messageInfo[1]);
+                    if (urbDelivered.contains(oneLightMessage)) continue;
+                    if (!urbMessages.containsKey(oneLightMessage)) {
+                        urbMessages.put(oneLightMessage, new HashSet<>());
+                        processManager.bestEffortBroadCast(oneLightMessage);
+                    }
+                    urbMessages.get(oneLightMessage).add(processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()).getId());
+                    if (urbMessages.get(oneLightMessage).size() > processManager.numberOfHosts() / 2) {
+                        urbDelivered.add(oneLightMessage);
+                        processManager.urbDeliver(oneLightMessage);
                     }
                 }
             }

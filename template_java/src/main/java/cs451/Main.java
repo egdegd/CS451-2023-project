@@ -66,7 +66,7 @@ public class Main {
         System.out.println("Path to config:");
         System.out.println("===============");
         System.out.println(parser.config() + "\n");
-        System.out.println(parser.messageNumber() + " " + parser.receiverId() + "\n");
+        System.out.println(parser.messageNumber() + "\n");
 
 
         System.out.println("Doing some initialization\n");
@@ -74,15 +74,10 @@ public class Main {
         processManager = new ProcessManager(curHost, parser.hosts());
 
         System.out.println("Broadcasting and delivering messages...\n");
-        Host receiverHost = Objects.requireNonNull(parser.hosts().stream().filter(x -> x.getId() == parser.receiverId()).findAny().orElse(null));
 
-        if (parser.myId() == parser.receiverId()) {
-            System.out.println("receiver\n");
-        } else {
-            System.out.println("sender\n");
-            for (int i = 1; i < parser.messageNumber() + 1; i++) {
-                processManager.PLSend(new Message(Integer.toString(i), curHost, receiverHost));
-            }
+
+        for (int i = 1; i < parser.messageNumber() + 1; i++) {
+            processManager.uniformReliableBroadcast(new LightMessage(curHost.getId(), Integer.toString(i)));
         }
 
         // After a process finishes broadcasting,

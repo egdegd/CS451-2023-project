@@ -50,3 +50,4 @@ public class Message implements Serializable {
                 && receiver.getId() == m.getReceiver().getId();
     }
 }
+

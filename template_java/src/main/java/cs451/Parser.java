@@ -74,7 +74,7 @@ public class Parser {
         return configParser.getMessageNumber();
     }
 
-    public int receiverId() {
-        return configParser.getReceiverId();
-    }
+//    public int receiverId() {
+//        return configParser.getReceiverId();
+//    }
 }
