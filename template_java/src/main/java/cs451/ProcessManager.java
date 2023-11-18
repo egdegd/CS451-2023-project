@@ -16,19 +16,16 @@ public class ProcessManager {
 
     public ProcessManager(Host host, List<Host> hostsList) throws IOException, ClassNotFoundException {
         DatagramSocket socket = new DatagramSocket(host.getPort());
-        receiver = new UDPReceiver(host.getPort(), socket, this);
-        sender = new UDPSender(socket, this);
         this.hostsList = hostsList;
         this.host = host;
+        receiver = new UDPReceiver(host.getPort(), socket, this);
+        sender = new UDPSender(socket, this);
         receiver.start();
         sender.start();
     }
 
     public void PLSend(Message m) {
         sender.addMessageToStubbornList(m);
-        synchronized (logs) {
-            logs.add("b " + m.getText());
-        }
     }
     public void send(boolean isAck, Message message) throws IOException {
         if (isAck) {
@@ -58,12 +55,17 @@ public class ProcessManager {
             logs.add("d " + message.getSenderId() + " " + message.getText());
         }
     }
+    public void FIFODeliver(LightMessage message) {
+        synchronized (logs) {
+            logs.add("d " + message.getSenderId() + " " + message.getText());
+        }
+    }
 
     public Host getHostByIpAndPort(String ip, int port) {
         return hostsList.stream().filter(x -> (Objects.equals(x.getIp(), ip)) && (x.getPort() == port) ).findAny().orElse(null);
     }
     public void bestEffortBroadCast(LightMessage m) {
-        String text = m.getSenderId() + "@@" + m.getText();
+        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
         for (Host reciverHost: hostsList) {
             if (reciverHost.getId() == m.getSenderId()) {
                 continue;
@@ -73,6 +75,9 @@ public class ProcessManager {
     }
     public void uniformReliableBroadcast(LightMessage m) {
         bestEffortBroadCast(m);
+        synchronized (logs) {
+            logs.add("b " + m.getText());
+        }
     }
     public List<Host> getHostsList() {
         return hostsList;

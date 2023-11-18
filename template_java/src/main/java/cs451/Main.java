@@ -77,7 +77,7 @@ public class Main {
 
 
         for (int i = 1; i < parser.messageNumber() + 1; i++) {
-            processManager.uniformReliableBroadcast(new LightMessage(curHost.getId(), Integer.toString(i)));
+            processManager.uniformReliableBroadcast(new LightMessage(curHost.getId(), Integer.toString(i), i));
         }
 
         // After a process finishes broadcasting,
