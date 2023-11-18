@@ -61,7 +61,7 @@ public class UDPReceiver extends Thread{
                         processManager.bestEffortBroadCast(oneLightMessage);
                     }
                     urbMessages.get(oneLightMessage).add(processManager.getHostByIpAndPort(IPAddress, receivePacket.getPort()).getId());
-                    if (urbMessages.get(oneLightMessage).size() >= processManager.numberOfHosts() / 2) {
+                    if (urbMessages.get(oneLightMessage).size() + 1 >= processManager.numberOfHosts() / 2) {
                         urbDelivered.add(oneLightMessage);
                         addToPending(oneLightMessage);
 //                        processManager.urbDeliver(oneLightMessage);
