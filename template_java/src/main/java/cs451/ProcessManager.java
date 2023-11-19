@@ -74,10 +74,10 @@ public class ProcessManager {
         }
     }
     public void uniformReliableBroadcast(LightMessage m) {
-        bestEffortBroadCast(m);
         synchronized (logs) {
             logs.add("b " + m.getText());
         }
+        bestEffortBroadCast(m);
     }
     public List<Host> getHostsList() {
         return hostsList;
