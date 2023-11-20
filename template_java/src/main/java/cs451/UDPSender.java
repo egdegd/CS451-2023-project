@@ -97,10 +97,4 @@ public class UDPSender extends Thread{
 //        System.out.println("SEND " + messageText + " " + receiverPort);
     }
 
-//    public void bestEffortBroadCast(Message m) {
-//        String text = m.getSender().getId() + "$" + m.getText();
-//        for (Host host: processManager.getHostsList()) {
-//
-//        }
-//    }
 }

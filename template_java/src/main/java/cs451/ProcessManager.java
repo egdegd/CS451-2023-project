@@ -2,19 +2,18 @@ package cs451;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class ProcessManager {
     private final UDPReceiver receiver;
     private final UDPSender sender;
     private final Host host;
     private final List<Host> hostsList;
-    private final List<String> logs = Collections.synchronizedList(new ArrayList<>());
+    public int lastFifoBroadcast = 0;
+    public Map<Integer, Integer> lastFifoDeliver = new HashMap<>();
 
-    public ProcessManager(Host host, List<Host> hostsList) throws IOException, ClassNotFoundException {
+
+    public ProcessManager(Host host, List<Host> hostsList) throws IOException {
         DatagramSocket socket = new DatagramSocket(host.getPort());
         this.hostsList = hostsList;
         this.host = host;
@@ -41,23 +40,11 @@ public class ProcessManager {
         return host;
     }
 
-    public List<String> getLogs() {
-        return logs;
-    }
-
-    public void deliver(Message message) {
-        synchronized (logs) {
-            logs.add("d " + message.getSender().getId() + " " + message.getText());
-        }
-    }
-    public void urbDeliver(LightMessage message) {
-        synchronized (logs) {
-            logs.add("d " + message.getSenderId() + " " + message.getText());
-        }
-    }
     public void FIFODeliver(LightMessage message) {
-        synchronized (logs) {
-            logs.add("d " + message.getSenderId() + " " + message.getText());
+        if (!lastFifoDeliver.containsKey(message.getSenderId())) {
+            lastFifoDeliver.put(message.getSenderId(), message.getMessageId());
+        } else {
+            lastFifoDeliver.put(message.getSenderId(), Math.max(lastFifoDeliver.get(message.getSenderId()), message.getMessageId()));
         }
     }
 
@@ -67,16 +54,11 @@ public class ProcessManager {
     public void bestEffortBroadCast(LightMessage m) {
         String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
         for (Host reciverHost: hostsList) {
-            if (reciverHost.getId() == m.getSenderId()) {
-                continue;
-            }
             PLSend(new Message(text, host, reciverHost));
         }
     }
     public void uniformReliableBroadcast(LightMessage m) {
-        synchronized (logs) {
-            logs.add("b " + m.getText());
-        }
+        lastFifoBroadcast = Math.max(lastFifoBroadcast, m.getMessageId());
         bestEffortBroadCast(m);
     }
     public List<Host> getHostsList() {
