@@ -17,6 +17,9 @@ public class ProcessManager {
         DatagramSocket socket = new DatagramSocket(host.getPort());
         this.hostsList = hostsList;
         this.host = host;
+        for (Host h: this.hostsList) {
+            lastFifoDeliver.put(h.getId(), 0);
+        }
         receiver = new UDPReceiver(host.getPort(), socket, this);
         sender = new UDPSender(socket, this);
         receiver.start();
@@ -41,11 +44,7 @@ public class ProcessManager {
     }
 
     public void FIFODeliver(LightMessage message) {
-        if (!lastFifoDeliver.containsKey(message.getSenderId())) {
-            lastFifoDeliver.put(message.getSenderId(), message.getMessageId());
-        } else {
-            lastFifoDeliver.put(message.getSenderId(), Math.max(lastFifoDeliver.get(message.getSenderId()), message.getMessageId()));
-        }
+        lastFifoDeliver.put(message.getSenderId(), Math.max(lastFifoDeliver.get(message.getSenderId()), message.getMessageId()));
     }
 
     public Host getHostByIpAndPort(String ip, int port) {

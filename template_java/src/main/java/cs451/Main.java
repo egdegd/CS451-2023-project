@@ -16,12 +16,14 @@ public class Main {
         //write/flush output file if necessary
         System.out.println("Writing output.");
         BufferedWriter writer = new BufferedWriter(new FileWriter(parser.output()));
-        for (int i = 1; i < processManager.lastFifoBroadcast + 1; i++) {
-            writer.write("b " + i + '\n');
-        }
-        for (Host host: processManager.getHostsList()) {
-            for (int i = 1; i < processManager.lastFifoDeliver.get(host.getId()) + 1; i++) {
-                writer.write("d " + host.getId() + " " + i + '\n');
+        if (processManager != null) {
+            for (int i = 1; i < processManager.lastFifoBroadcast + 1; i++) {
+                writer.write("b " + i + '\n');
+            }
+            for (Host host : processManager.getHostsList()) {
+                for (int i = 1; i < processManager.lastFifoDeliver.getOrDefault(host.getId(), 0) + 1; i++) {
+                    writer.write("d " + host.getId() + " " + i + '\n');
+                }
             }
         }
         writer.close();
