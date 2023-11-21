@@ -26,9 +26,9 @@ public class ProcessManager {
         sender.start();
     }
 
-    public void PLSend(Message m) {
-        sender.addMessageToStubbornList(m);
-    }
+//    public void PLSend(Message m) {
+//        sender.addBebMessageToStubbornList(m);
+//    }
     public void send(boolean isAck, Message message) throws IOException {
         if (isAck) {
             sender.UdpSend("is_ack&&" + message.getText(), message.getSender().getIp(), message.getSender().getPort());
@@ -53,18 +53,20 @@ public class ProcessManager {
     }
     public void bestEffortBroadCast(LightMessage m) {
         String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
-        for (Host reciverHost: hostsList) {
-            PLSend(new Message(text, host, reciverHost));
-        }
+        sender.addBebMessageToStubbornList(m);
+//        for (Host reciverHost: hostsList) {
+//            PLSend(new Message(text, host, reciverHost));
+//        }
     }
     public void uniformReliableBroadcast(LightMessage m) {
         lastFifoBroadcast = Math.max(lastFifoBroadcast, m.getMessageId());
 //        bestEffortBroadCast(m);
-        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
-        for (Host reciverHost: hostsList) {
-            Message new_m = new Message(text, host, reciverHost);
-            sender.addMessageToURB(new_m);
-        }
+        sender.addUrbMessageToStubbornList(m);
+//        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
+//        for (Host reciverHost: hostsList) {
+//            Message new_m = new Message(text, host, reciverHost);
+//            sender.addUrbMessageToStubbornList(new_m);
+//        }
     }
     public List<Host> getHostsList() {
         return hostsList;

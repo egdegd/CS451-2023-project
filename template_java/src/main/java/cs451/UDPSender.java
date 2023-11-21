@@ -6,110 +6,145 @@ import java.util.*;
 
 public class UDPSender extends Thread{
     private final DatagramSocket clientSocket;
-    private final List<Message> StubbornMessages = Collections.synchronizedList(new ArrayList<>());
-    private final List<Message> StubbornMessagesURB = Collections.synchronizedList(new ArrayList<>());
-    private final Map<Integer, LinkedList<Message>> messagesByReceiver = new HashMap<>();
-    private final Map<Integer, LinkedList<Message>> messagesByReceiverURB = new HashMap<>();
+    private final List<LightMessage> stubbornMessagesBeb = Collections.synchronizedList(new ArrayList<>());
+    private final Map<Integer, Integer> nextBebIndex = new HashMap<>();
+    private final List<LightMessage> stubbornMessagesUrb = Collections.synchronizedList(new ArrayList<>());
+    private final Map<Integer, Integer> nextUrbIndex = new HashMap<>();
+    private final Map<Integer, List<LightMessage>> messagesByReceiver = new HashMap<>();
     private final ProcessManager processManager;
+    int batchSize = 8;
+
     public UDPSender(DatagramSocket socket, ProcessManager processManager) {
         // Create a Datagram Socket
         clientSocket = socket;
         this.processManager = processManager;
+        for (Host h: processManager.getHostsList()) {
+            messagesByReceiver.put(h.getId(), Collections.synchronizedList(new ArrayList<>()));
+            nextBebIndex.put(h.getId(), 0);
+            nextUrbIndex.put(h.getId(), 0);
+        }
     }
 
     public void run() {
         while (true) {
+            try {
+                sleep(10);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
             combineMessagesByReceiver();
             try {
-                sendBatch(8);
+                sendBatch();
             } catch (IOException | ClassNotFoundException e) {
                 throw new RuntimeException(e);
+            }
+            int minLastBeb = Integer.MAX_VALUE;
+            int minLastUrb = Integer.MAX_VALUE;
+            for (Host h: processManager.getHostsList()) {
+                minLastBeb = Math.min(minLastBeb, nextBebIndex.get(h.getId()));
+                minLastUrb = Math.min(minLastUrb, nextUrbIndex.get(h.getId()));
+            }
+            synchronized (stubbornMessagesBeb) {
+                if (minLastBeb > 0) {
+                    stubbornMessagesBeb.subList(0, minLastBeb).clear();
+                    synchronized (nextBebIndex) {
+                        int finalMinLastBeb = minLastBeb;
+                        nextBebIndex.replaceAll((id, v) -> v - finalMinLastBeb);
+                    }
+                }
+            }
+            synchronized (stubbornMessagesUrb) {
+                if (minLastUrb > 0) {
+                    stubbornMessagesUrb.subList(0, minLastUrb).clear();
+                    synchronized (nextUrbIndex) {
+                        int finalMinLastUrb = minLastUrb;
+                        nextUrbIndex.replaceAll((id, v) -> v - finalMinLastUrb);
+                    }
+                }
             }
         }
     }
 
-    private void sendBatch(int batchSize) throws IOException, ClassNotFoundException {
+    private void sendBatch() throws IOException, ClassNotFoundException {
         for (Host host: processManager.getHostsList()) {
-            if (messagesByReceiver.containsKey(host.getId())) {
-                LinkedList<Message> ms = messagesByReceiver.get(host.getId());
-                StringBuilder concatMessages = new StringBuilder();
-                concatMessages.setLength(0);
-                int curBatchSize = 0;
-                int batchnumber = 0;
-                while (!ms.isEmpty()) {
+            List<LightMessage> messagesToSend = messagesByReceiver.get(host.getId());
+            StringBuilder concatMessages = new StringBuilder();
+            concatMessages.setLength(0);
+            int curBatchSize = 0;
+            int batchNumber = 0;
+            synchronized (messagesToSend) {
+                for(LightMessage m: messagesToSend) {
                     if (curBatchSize == batchSize) {
                         try {
                             UdpSend(concatMessages.toString(),host.getIp(), host.getPort());
-                            batchnumber += 1;
+                            batchNumber += 1;
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
                         curBatchSize = 0;
                         concatMessages.setLength(0);
                     }
-                    concatMessages.append(ms.remove().getText()).append("&&");
+                    String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
+                    concatMessages.append(text).append("&&");
                     curBatchSize += 1;
-                    if (batchnumber == 100) {
+                    if (batchNumber == 100) {
                         try {
                             sleep(10);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
-                        batchnumber = 0;
+                        batchNumber = 0;
                     }
                 }
                 if (concatMessages.length() > 0) {
                     UdpSend(concatMessages.toString(), host.getIp(), host.getPort());
-                }
-            }
-            if (messagesByReceiverURB.containsKey(host.getId())) {
-                LinkedList<Message> urbMessages = messagesByReceiverURB.get(host.getId());
-                int curURBBatchSize = 0;
-                StringBuilder concatMessages = new StringBuilder();
-                concatMessages.setLength(0);
-                while ((!urbMessages.isEmpty()) && (curURBBatchSize < batchSize)) {
-                    concatMessages.append(urbMessages.remove().getText()).append("&&");
-                    curURBBatchSize += 1;
-                }
-                if (concatMessages.length() > 0) {
-                    UdpSend(concatMessages.toString(), host.getIp(), host.getPort());
+                    concatMessages.setLength(0);
                 }
             }
         }
     }
 
     private void combineMessagesByReceiver() {
-        synchronized (StubbornMessages) {
-            for (Message m: StubbornMessages) {
-                if (!messagesByReceiver.containsKey(m.getReceiver().getId())) {
-                    messagesByReceiver.put(m.getReceiver().getId(), new LinkedList<>());
+        for (Host h: processManager.getHostsList()) {
+            List<LightMessage> messagesToSend = messagesByReceiver.get(h.getId());
+            synchronized (messagesToSend) {
+                synchronized (stubbornMessagesBeb) {
+                    int next = nextBebIndex.get(h.getId());
+                    while (messagesToSend.size() < batchSize) {
+                        if (stubbornMessagesBeb.size() <= next) {
+                            break;
+                        }
+                        messagesToSend.add(stubbornMessagesBeb.get(next));
+                        next += 1;
+                        nextBebIndex.put(h.getId(), next);
+                    }
                 }
-                messagesByReceiver.get(m.getReceiver().getId()).add(m);
-            }
-        }
-        synchronized (StubbornMessagesURB) {
-            for (Message m: StubbornMessagesURB) {
-                if (!messagesByReceiverURB.containsKey(m.getReceiver().getId())) {
-                    messagesByReceiverURB.put(m.getReceiver().getId(), new LinkedList<>());
-                }
-                if (!messagesByReceiverURB.get(m.getReceiver().getId()).contains(m)) {
-                    messagesByReceiverURB.get(m.getReceiver().getId()).add(m);
+                synchronized (stubbornMessagesUrb) {
+                    int next = nextUrbIndex.get(h.getId());
+                    while (messagesToSend.size() < batchSize) {
+                        if (stubbornMessagesUrb.size() <= next) {
+                            break;
+                        }
+                        messagesToSend.add(stubbornMessagesUrb.get(next));
+                        next += 1;
+                        nextUrbIndex.put(h.getId(), next);
+                    }
                 }
             }
         }
     }
 
-    public void addMessageToStubbornList(Message m) {
-        synchronized (StubbornMessages) {
-            StubbornMessages.add(m);
+    public void addBebMessageToStubbornList(LightMessage m) {
+        synchronized (stubbornMessagesBeb) {
+            stubbornMessagesBeb.add(m);
         }
     }
     public void deleteMessageFromStubbornList(Message message) {
-        synchronized (StubbornMessagesURB) {
-            StubbornMessagesURB.remove(message);
-        }
-        synchronized (StubbornMessages) {
-            StubbornMessages.remove(message);
+
+        String[] messageInfo = message.getText().split("@@");
+        LightMessage oneLightMessage = new LightMessage(Integer.parseInt(messageInfo[0]), messageInfo[1], Integer.parseInt(messageInfo[2]));
+        synchronized (messagesByReceiver) {
+            messagesByReceiver.get(message.getReceiver().getId()).remove(oneLightMessage);
         }
     }
     public void UdpSend(String messageText, String receiverIp, int receiverPort) throws IOException {
@@ -119,9 +154,9 @@ public class UDPSender extends Thread{
 //        System.out.println("SEND " + messageText + " " + receiverPort);
     }
 
-    public void addMessageToURB(Message m) {
-        synchronized (StubbornMessagesURB) {
-            StubbornMessagesURB.add(m);
+    public void addUrbMessageToStubbornList(LightMessage m) {
+        synchronized (stubbornMessagesUrb) {
+            stubbornMessagesUrb.add(m);
         }
     }
 }
