@@ -33,6 +33,7 @@ public class ProcessManager {
         if (isAck) {
             sender.UdpSend("is_ack&&" + message.getText(), message.getSender().getIp(), message.getSender().getPort());
         } else {
+//            Useless condition
             sender.UdpSend(message.getText(), message.getReceiver().getIp(), message.getReceiver().getPort());
         }
     }
@@ -58,7 +59,12 @@ public class ProcessManager {
     }
     public void uniformReliableBroadcast(LightMessage m) {
         lastFifoBroadcast = Math.max(lastFifoBroadcast, m.getMessageId());
-        bestEffortBroadCast(m);
+//        bestEffortBroadCast(m);
+        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
+        for (Host reciverHost: hostsList) {
+            Message new_m = new Message(text, host, reciverHost);
+            sender.addMessageToURB(new_m);
+        }
     }
     public List<Host> getHostsList() {
         return hostsList;

@@ -7,7 +7,9 @@ import java.util.*;
 public class UDPSender extends Thread{
     private final DatagramSocket clientSocket;
     private final List<Message> StubbornMessages = Collections.synchronizedList(new ArrayList<>());
+    private final List<Message> StubbornMessagesURB = Collections.synchronizedList(new ArrayList<>());
     private final Map<Integer, LinkedList<Message>> messagesByReceiver = new HashMap<>();
+    private final Map<Integer, LinkedList<Message>> messagesByReceiverURB = new HashMap<>();
     private final ProcessManager processManager;
     public UDPSender(DatagramSocket socket, ProcessManager processManager) {
         // Create a Datagram Socket
@@ -27,43 +29,50 @@ public class UDPSender extends Thread{
     }
 
     private void sendBatch(int batchSize) throws IOException, ClassNotFoundException {
-        for (int id : messagesByReceiver.keySet()) {
-            Host receiverHost = null;
-            LinkedList<Message> ms = messagesByReceiver.get(id);
-            StringBuilder concatMessages = new StringBuilder();
-            concatMessages.setLength(0);
-            int curBatchSize = 0;
-            int batchnumber = 0;
-            while (!ms.isEmpty()) {
-                receiverHost = ms.getFirst().getReceiver();
-                if (curBatchSize == batchSize) {
-                    try {
-                        UdpSend(concatMessages.toString(),receiverHost.getIp(), receiverHost.getPort());
-                        batchnumber += 1;
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+        for (Host host: processManager.getHostsList()) {
+            if (messagesByReceiver.containsKey(host.getId())) {
+                LinkedList<Message> ms = messagesByReceiver.get(host.getId());
+                StringBuilder concatMessages = new StringBuilder();
+                concatMessages.setLength(0);
+                int curBatchSize = 0;
+                int batchnumber = 0;
+                while (!ms.isEmpty()) {
+                    if (curBatchSize == batchSize) {
+                        try {
+                            UdpSend(concatMessages.toString(),host.getIp(), host.getPort());
+                            batchnumber += 1;
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        curBatchSize = 0;
+                        concatMessages.setLength(0);
                     }
-                    curBatchSize = 0;
-                    concatMessages.setLength(0);
-                }
-                concatMessages.append(ms.remove().getText()).append("&&");
-                curBatchSize += 1;
-                if (batchnumber == 100) {
-                    try {
-                        sleep(10);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+                    concatMessages.append(ms.remove().getText()).append("&&");
+                    curBatchSize += 1;
+                    if (batchnumber == 100) {
+                        try {
+                            sleep(10);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                        batchnumber = 0;
                     }
-                    batchnumber = 0;
                 }
-
+                if (concatMessages.length() > 0) {
+                    UdpSend(concatMessages.toString(), host.getIp(), host.getPort());
+                }
             }
-            if (concatMessages.length() > 0) {
-                try {
-                    assert receiverHost != null;
-                    UdpSend(concatMessages.toString(), receiverHost.getIp(), receiverHost.getPort());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+            if (messagesByReceiverURB.containsKey(host.getId())) {
+                LinkedList<Message> urbMessages = messagesByReceiverURB.get(host.getId());
+                int curURBBatchSize = 0;
+                StringBuilder concatMessages = new StringBuilder();
+                concatMessages.setLength(0);
+                while ((!urbMessages.isEmpty()) && (curURBBatchSize < batchSize)) {
+                    concatMessages.append(urbMessages.remove().getText()).append("&&");
+                    curURBBatchSize += 1;
+                }
+                if (concatMessages.length() > 0) {
+                    UdpSend(concatMessages.toString(), host.getIp(), host.getPort());
                 }
             }
         }
@@ -78,6 +87,16 @@ public class UDPSender extends Thread{
                 messagesByReceiver.get(m.getReceiver().getId()).add(m);
             }
         }
+        synchronized (StubbornMessagesURB) {
+            for (Message m: StubbornMessagesURB) {
+                if (!messagesByReceiverURB.containsKey(m.getReceiver().getId())) {
+                    messagesByReceiverURB.put(m.getReceiver().getId(), new LinkedList<>());
+                }
+                if (!messagesByReceiverURB.get(m.getReceiver().getId()).contains(m)) {
+                    messagesByReceiverURB.get(m.getReceiver().getId()).add(m);
+                }
+            }
+        }
     }
 
     public void addMessageToStubbornList(Message m) {
@@ -86,6 +105,9 @@ public class UDPSender extends Thread{
         }
     }
     public void deleteMessageFromStubbornList(Message message) {
+        synchronized (StubbornMessagesURB) {
+            StubbornMessagesURB.remove(message);
+        }
         synchronized (StubbornMessages) {
             StubbornMessages.remove(message);
         }
@@ -97,4 +119,9 @@ public class UDPSender extends Thread{
 //        System.out.println("SEND " + messageText + " " + receiverPort);
     }
 
+    public void addMessageToURB(Message m) {
+        synchronized (StubbornMessagesURB) {
+            StubbornMessagesURB.add(m);
+        }
+    }
 }
