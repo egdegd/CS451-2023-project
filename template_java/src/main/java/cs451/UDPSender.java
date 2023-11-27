@@ -110,7 +110,7 @@ public class UDPSender extends Thread{
             synchronized (messagesToSend) {
                 synchronized (stubbornMessagesBeb) {
                     int next = nextBebIndex.get(h.getId());
-                    while (messagesToSend.size() < batchSize) {
+                    while (messagesToSend.size() < 100) {
                         if (stubbornMessagesBeb.size() <= next) {
                             break;
                         }
@@ -121,7 +121,7 @@ public class UDPSender extends Thread{
                 }
                 synchronized (stubbornMessagesUrb) {
                     int next = nextUrbIndex.get(h.getId());
-                    while (messagesToSend.size() < batchSize) {
+                    while (messagesToSend.size() < 100) {
                         if (stubbornMessagesUrb.size() <= next) {
                             break;
                         }
