@@ -8,10 +8,11 @@ public class UDPSender extends Thread{
     private final DatagramSocket clientSocket;
     private final List<LightMessage> stubbornMessagesBeb = Collections.synchronizedList(new ArrayList<>());
     private final Map<Integer, Integer> nextBebIndex = new HashMap<>();
-    private final List<LightMessage> stubbornMessagesUrb = Collections.synchronizedList(new ArrayList<>());
+//    private final List<LightMessage> stubbornMessagesUrb = Collections.synchronizedList(new ArrayList<>());
     private final Map<Integer, Integer> nextUrbIndex = new HashMap<>();
     private final Map<Integer, List<LightMessage>> messagesByReceiver = new HashMap<>();
     private final ProcessManager processManager;
+    private int desiredLastUrb = 0;
     int batchSize = 8;
 
     public UDPSender(DatagramSocket socket, ProcessManager processManager) {
@@ -21,7 +22,7 @@ public class UDPSender extends Thread{
         for (Host h: processManager.getHostsList()) {
             messagesByReceiver.put(h.getId(), Collections.synchronizedList(new ArrayList<>()));
             nextBebIndex.put(h.getId(), 0);
-            nextUrbIndex.put(h.getId(), 0);
+            nextUrbIndex.put(h.getId(), 1);
         }
     }
 
@@ -53,15 +54,15 @@ public class UDPSender extends Thread{
                     }
                 }
             }
-            synchronized (stubbornMessagesUrb) {
-                if (minLastUrb > 0) {
-                    stubbornMessagesUrb.subList(0, minLastUrb).clear();
-                    synchronized (nextUrbIndex) {
-                        int finalMinLastUrb = minLastUrb;
-                        nextUrbIndex.replaceAll((id, v) -> v - finalMinLastUrb);
-                    }
-                }
-            }
+//            synchronized (stubbornMessagesUrb) {
+//                if (minLastUrb > 0) {
+//                    stubbornMessagesUrb.subList(0, minLastUrb).clear();
+//                    synchronized (nextUrbIndex) {
+//                        int finalMinLastUrb = minLastUrb;
+//                        nextUrbIndex.replaceAll((id, v) -> v - finalMinLastUrb);
+//                    }
+//                }
+//            }
         }
     }
 
@@ -119,16 +120,14 @@ public class UDPSender extends Thread{
                         nextBebIndex.put(h.getId(), next);
                     }
                 }
-                synchronized (stubbornMessagesUrb) {
-                    int next = nextUrbIndex.get(h.getId());
-                    while (messagesToSend.size() < 100) {
-                        if (stubbornMessagesUrb.size() <= next) {
-                            break;
-                        }
-                        messagesToSend.add(stubbornMessagesUrb.get(next));
-                        next += 1;
-                        nextUrbIndex.put(h.getId(), next);
+                int next = nextUrbIndex.get(h.getId());
+                while (messagesToSend.size() < 100) {
+                    if (next > desiredLastUrb) {
+                        break;
                     }
+                    messagesToSend.add(new LightMessage(processManager.getHost().getId(), Integer.toString(next), next));
+                    next += 1;
+                    nextUrbIndex.put(h.getId(), next);
                 }
             }
         }
@@ -155,8 +154,9 @@ public class UDPSender extends Thread{
     }
 
     public void addUrbMessageToStubbornList(LightMessage m) {
-        synchronized (stubbornMessagesUrb) {
-            stubbornMessagesUrb.add(m);
-        }
+        desiredLastUrb = Math.max(desiredLastUrb, m.getMessageId());
+//        synchronized (stubbornMessagesUrb) {
+//            stubbornMessagesUrb.add(m);
+//        }
     }
 }

@@ -52,7 +52,6 @@ public class ProcessManager {
         return hostsList.stream().filter(x -> (Objects.equals(x.getIp(), ip)) && (x.getPort() == port) ).findAny().orElse(null);
     }
     public void bestEffortBroadCast(LightMessage m) {
-        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
         sender.addBebMessageToStubbornList(m);
 //        for (Host reciverHost: hostsList) {
 //            PLSend(new Message(text, host, reciverHost));
