@@ -159,4 +159,7 @@ public class UDPSender extends Thread{
 //            stubbornMessagesUrb.add(m);
 //        }
     }
+
+    public void addBebMessageToStubbornList(LAMessage m) {
+    }
 }

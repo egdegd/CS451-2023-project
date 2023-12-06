@@ -77,4 +77,8 @@ public class ProcessManager {
     public Integer numberOfHosts() {
         return hostsList.size();
     }
+
+    public void bestEffortBroadCast(LAMessage m) {
+        sender.addBebMessageToStubbornList(m);
+    }
 }

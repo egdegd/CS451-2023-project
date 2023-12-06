@@ -3,7 +3,9 @@ package cs451;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Objects;
+import java.util.Set;
 
 public class Main {
     private static ProcessManager processManager;
@@ -71,7 +73,6 @@ public class Main {
         System.out.println("Path to config:");
         System.out.println("===============");
         System.out.println(parser.config() + "\n");
-        System.out.println(parser.messageNumber() + "\n");
 
 
         System.out.println("Doing some initialization\n");
@@ -79,10 +80,8 @@ public class Main {
         processManager = new ProcessManager(curHost, parser.hosts());
 
         System.out.println("Broadcasting and delivering messages...\n");
-
-
-        for (int i = 1; i < parser.messageNumber() + 1; i++) {
-            processManager.uniformReliableBroadcast(new LightMessage(curHost.getId(), Integer.toString(i), i));
+        for (Set<Integer> proposal: parser.getProposals()) {
+            System.out.println(proposal);
         }
 
         // After a process finishes broadcasting,

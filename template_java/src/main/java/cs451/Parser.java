@@ -1,6 +1,8 @@
 package cs451;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class Parser {
 
@@ -70,8 +72,8 @@ public class Parser {
         return configParser.getPath();
     }
 
-    public int messageNumber() {
-        return configParser.getMessageNumber();
+    public ArrayList<Set<Integer>> getProposals() {
+        return configParser.getProposals();
     }
 
 //    public int receiverId() {
