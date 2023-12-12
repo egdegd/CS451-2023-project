@@ -3,9 +3,7 @@ package cs451;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 public class Main {
     private static ProcessManager processManager;
@@ -17,18 +15,21 @@ public class Main {
 
         //write/flush output file if necessary
         System.out.println("Writing output.");
-        BufferedWriter writer = new BufferedWriter(new FileWriter(parser.output()));
-        if (processManager != null) {
-            for (int i = 1; i < processManager.lastFifoBroadcast + 1; i++) {
-                writer.write("b " + i + '\n');
-            }
-            for (Host host : processManager.getHostsList()) {
-                for (int i = 1; i < processManager.lastFifoDeliver.getOrDefault(host.getId(), 0) + 1; i++) {
-                    writer.write("d " + host.getId() + " " + i + '\n');
+        logServerOutput();
+    }
+    private static void logServerOutput() {
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(parser.output()));
+            synchronized (processManager.logs) {
+                for (String propose : processManager.logs) {
+                    if (propose == null) break;
+                    writer.write(propose + "\n");
                 }
             }
+            writer.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        writer.close();
     }
 
     private static void initSignalHandlers() {
@@ -80,8 +81,10 @@ public class Main {
         processManager = new ProcessManager(curHost, parser.hosts());
 
         System.out.println("Broadcasting and delivering messages...\n");
-        for (Set<Integer> proposal: parser.getProposals()) {
-            System.out.println(proposal);
+        for (int i = 0; i <  parser.getProposals().size(); i++) {
+//            System.out.print(i);
+//            System.out.println( parser.getProposals().get(i));
+            processManager.la.propose(parser.getProposals().get(i), i);
         }
 
         // After a process finishes broadcasting,

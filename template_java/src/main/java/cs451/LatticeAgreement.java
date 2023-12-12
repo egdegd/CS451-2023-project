@@ -13,16 +13,30 @@ public class LatticeAgreement {
         maxFaulty = (processManager.getHostsList().size() - 1) / 2;
     }
     public void propose(Set<Integer> proposal, int gameNumber) {
-        Game game = new Game(proposal, gameNumber);
-        games.add(game);
-        LAMessage m = new LAMessage(game);
+        Game game;
+        synchronized (games) {
+            game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+            if (game == null) {
+                game = new Game(proposal, gameNumber);
+                games.add(game);
+            } else {
+                game.proposedValue.addAll(proposal);
+            }
+        }
+        LAMessage m = new LAMessage(game, processManager.getHost().getId());
+//        System.out.println("Propose " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
         processManager.bestEffortBroadCast(m);
     }
     public void receiveAck(int gameNumber, int proposalNumber) {
-        Game game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+//        TODO: replace list by hashset by number of the game?
+        Game game;
+        synchronized (games) {
+            game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+        }
         if (game == null) {
             return;
         }
+//        System.out.println("ReceiveAck " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
         if (proposalNumber == game.activeProposalNumber) {
 //            TODO: maintain counting in old rounds
             game.ackCount++;
@@ -30,59 +44,92 @@ public class LatticeAgreement {
         }
     }
     public void receiveNack(int gameNumber, int proposalNumber, Set<Integer> value) {
-        Game game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+        Game game;
+        synchronized (games) {
+            game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+        }
         if (game == null) {
             return;
         }
+//        System.out.println("ReceiveNack " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
+//        System.out.println(proposalNumber);
         if (proposalNumber == game.activeProposalNumber) {
             game.nackCount++;
             game.proposedValue.addAll(value);
             checkGame(game);
         }
+
     }
 
     public void receiveProposal(int gameNumber, int proposalNumber, Set<Integer> proposedValue, Host senderHost) {
-        Game game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
-        if (proposedValue.containsAll(game.proposedValue)) {
-            game.proposedValue.addAll(proposedValue);
-            sendAck(proposalNumber, senderHost);
+        Game game;
+        synchronized (games) {
+            game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
+            if (game == null) {
+                game = new Game(gameNumber);
+                games.add(game);
+            }
+        }
+        if (proposedValue.containsAll(game.acceptedValue)) {
+//            System.out.println("SendAck " + gameNumber + ' ' + game.acceptedValue + ' ' + proposalNumber + ' ' + senderHost.getId());
+            if (game.active) {
+                game.acceptedValue.addAll(proposedValue);
+            }
+            sendAck(gameNumber, proposalNumber, senderHost);
         } else {
-            game.proposedValue.addAll(proposedValue);
-            sendNack(game.proposedValue, senderHost);
+//            System.out.println("SendNack " + gameNumber + ' ' + proposalNumber + ' ' + game.acceptedValue + ' ' + proposedValue + ' ' + senderHost.getId());
+            if (game.active) {
+                game.acceptedValue.addAll(proposedValue);
+            }
+            Set<Integer> diff = new HashSet<>(game.acceptedValue);
+            diff.removeAll(proposedValue);
+            sendNack(gameNumber, proposalNumber, diff, senderHost);
         }
     }
 
-    private void sendNack(Set<Integer> proposedValue, Host senderHost) {
-        String text = "";
+    public void sendNack(int gameNumber, int proposalNumber, Set<Integer> diff, Host senderHost) {
+//        TODO: send only diff
+        String text = "LANack@@" + gameNumber + "@@" + proposalNumber + "@@" + textByProposed(diff);
         Message message = new Message(text, processManager.getHost(), senderHost);
         processManager.addToStubbornLink(message);
     }
 
-    private void sendAck(int proposalNumber, Host senderHost) {
-        String text = "";
+    private String textByProposed(Set<Integer> proposedValue) {
+        StringBuilder concatPropose = new StringBuilder();
+        for(int pr : proposedValue) {
+            concatPropose.append(pr).append("@@");
+        }
+        return concatPropose.toString();
+    }
+
+    public void sendAck(int gameNumber, int proposalNumber, Host senderHost) {
+        String text = "LAAck@@" + gameNumber + "@@" + proposalNumber + "@@";
         Message message = new Message(text, processManager.getHost(), senderHost);
         processManager.addToStubbornLink(message);
     }
 
-    private void checkGame(Game game) {
+    public void checkGame(Game game) {
 //        TODO: compare the difference
-//        if (game.nackNumber > 0 && game.ackNumber + game.nackNumber >= maxFaulty + 1 && game.active) {
+//        if (game.nackCount > 0 && game.ackCount + game.nackCount >= maxFaulty + 1 && game.active) {
         if (game.nackCount > 0 && game.active) {
             game.activeProposalNumber++;
             game.nackCount = 0;
             game.ackCount = 0;
-            LAMessage m = new LAMessage(game);
+            LAMessage m = new LAMessage(game, processManager.getHost().getId());
             processManager.bestEffortBroadCast(m);
+//            System.out.println("NewPropose " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
         }
         if (game.active && game.ackCount >= maxFaulty + 1)
         {
+//            System.out.println(maxFaulty + " " +  game.ackCount);
             decide(game);
         }
 
     }
 
-    private void decide(Game game) {
+    public void decide(Game game) {
+        processManager.decide(game);
         game.active = false;
-//        TODO: do something
+//        System.out.println("DECIDE. GAME " + game.gameNumber + " VALUE " + game.proposedValue);
     }
 }

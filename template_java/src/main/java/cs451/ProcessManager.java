@@ -10,35 +10,28 @@ public class ProcessManager {
     private final Host host;
     private final List<Host> hostsList;
     public int lastFifoBroadcast = 0;
+    public final LatticeAgreement la;
     public Map<Integer, Integer> lastFifoDeliver = new HashMap<>();
-
+    public final List<String> logs = Collections.synchronizedList(new LinkedList<>());
+    private Map<Integer, String> results = new HashMap<>();
+    private int lastResult = 0;
 
     public ProcessManager(Host host, List<Host> hostsList) throws IOException {
         DatagramSocket socket = new DatagramSocket(host.getPort());
         this.hostsList = hostsList;
         this.host = host;
-        for (Host h: this.hostsList) {
-            lastFifoDeliver.put(h.getId(), 0);
-        }
+        la = new LatticeAgreement(this);
         receiver = new UDPReceiver(host.getPort(), socket, this);
         sender = new UDPSender(socket, this);
         receiver.start();
         sender.start();
     }
 
-//    public void PLSend(Message m) {
-//        sender.addBebMessageToStubbornList(m);
-//    }
-    public void send(boolean isAck, Message message) throws IOException {
-        if (isAck) {
-            sender.UdpSend("is_ack&&" + message.getText(), message.getSender().getIp(), message.getSender().getPort());
-        } else {
-//            Useless condition
-            sender.UdpSend(message.getText(), message.getReceiver().getIp(), message.getReceiver().getPort());
-        }
+    public void sendAck(Message message) throws IOException {
+        sender.UdpSend("is_ack&&" + message.getText(), message.getSender().getIp(), message.getSender().getPort());
     }
-    public void deleteMessageFromStubbornList(Message message) {
-        sender.deleteMessageFromStubbornList(message);
+    public void deleteMessageFromStubbornList(String message, Host receiver) {
+        sender.deleteMessageFromStubbornList(message, receiver.getId());
     }
     public Host getHost() {
         return host;
@@ -51,22 +44,7 @@ public class ProcessManager {
     public Host getHostByIpAndPort(String ip, int port) {
         return hostsList.stream().filter(x -> (Objects.equals(x.getIp(), ip)) && (x.getPort() == port) ).findAny().orElse(null);
     }
-    public void bestEffortBroadCast(LightMessage m) {
-        sender.addBebMessageToStubbornList(m);
-//        for (Host reciverHost: hostsList) {
-//            PLSend(new Message(text, host, reciverHost));
-//        }
-    }
-    public void uniformReliableBroadcast(LightMessage m) {
-        lastFifoBroadcast = Math.max(lastFifoBroadcast, m.getMessageId());
-//        bestEffortBroadCast(m);
-        sender.addUrbMessageToStubbornList(m);
-//        String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
-//        for (Host reciverHost: hostsList) {
-//            Message new_m = new Message(text, host, reciverHost);
-//            sender.addUrbMessageToStubbornList(new_m);
-//        }
-    }
+
     public List<Host> getHostsList() {
         return hostsList;
     }
@@ -80,5 +58,24 @@ public class ProcessManager {
 
     public void bestEffortBroadCast(LAMessage m) {
         sender.addBebMessageToStubbornList(m);
+    }
+
+    public void addToStubbornLink(Message message) {
+        sender.addMessageToStubbornList(message);
+    }
+    public void decide(Game game) {
+        StringBuilder concatPropose = new StringBuilder();
+        for(int pr : game.proposedValue) {
+            concatPropose.append(pr).append(" ");
+        }
+        concatPropose.deleteCharAt(concatPropose.length() - 1);
+        results.put(game.gameNumber, concatPropose.toString());
+        synchronized (logs) {
+            while (results.containsKey(lastResult)) {
+                logs.add(results.get(lastResult));
+                results.remove(lastResult);
+                lastResult++;
+            }
+        }
     }
 }

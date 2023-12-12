@@ -6,13 +6,12 @@ import java.util.*;
 
 public class UDPSender extends Thread{
     private final DatagramSocket clientSocket;
-    private final List<LightMessage> stubbornMessagesBeb = Collections.synchronizedList(new ArrayList<>());
+    private final List<LAMessage> stubbornMessagesBeb = Collections.synchronizedList(new ArrayList<>());
     private final Map<Integer, Integer> nextBebIndex = new HashMap<>();
-//    private final List<LightMessage> stubbornMessagesUrb = Collections.synchronizedList(new ArrayList<>());
-    private final Map<Integer, Integer> nextUrbIndex = new HashMap<>();
-    private final Map<Integer, List<LightMessage>> messagesByReceiver = new HashMap<>();
+    private final Map<Integer, List<String>> messagesByReceiver = new HashMap<>();
     private final ProcessManager processManager;
-    private int desiredLastUrb = 0;
+    final private int throughput = 100;
+
     int batchSize = 8;
 
     public UDPSender(DatagramSocket socket, ProcessManager processManager) {
@@ -22,7 +21,7 @@ public class UDPSender extends Thread{
         for (Host h: processManager.getHostsList()) {
             messagesByReceiver.put(h.getId(), Collections.synchronizedList(new ArrayList<>()));
             nextBebIndex.put(h.getId(), 0);
-            nextUrbIndex.put(h.getId(), 1);
+//            nextUrbIndex.put(h.getId(), 1);
         }
     }
 
@@ -40,10 +39,8 @@ public class UDPSender extends Thread{
                 throw new RuntimeException(e);
             }
             int minLastBeb = Integer.MAX_VALUE;
-            int minLastUrb = Integer.MAX_VALUE;
             for (Host h: processManager.getHostsList()) {
                 minLastBeb = Math.min(minLastBeb, nextBebIndex.get(h.getId()));
-                minLastUrb = Math.min(minLastUrb, nextUrbIndex.get(h.getId()));
             }
             synchronized (stubbornMessagesBeb) {
                 if (minLastBeb > 0) {
@@ -68,13 +65,13 @@ public class UDPSender extends Thread{
 
     private void sendBatch() throws IOException, ClassNotFoundException {
         for (Host host: processManager.getHostsList()) {
-            List<LightMessage> messagesToSend = messagesByReceiver.get(host.getId());
+            List<String> messagesToSend = messagesByReceiver.get(host.getId());
             StringBuilder concatMessages = new StringBuilder();
             concatMessages.setLength(0);
             int curBatchSize = 0;
             int batchNumber = 0;
             synchronized (messagesToSend) {
-                for(LightMessage m: messagesToSend) {
+                for(String m: messagesToSend) {
                     if (curBatchSize == batchSize) {
                         try {
                             UdpSend(concatMessages.toString(),host.getIp(), host.getPort());
@@ -85,8 +82,7 @@ public class UDPSender extends Thread{
                         curBatchSize = 0;
                         concatMessages.setLength(0);
                     }
-                    String text = m.getSenderId() + "@@" + m.getText() + "@@" + m.getMessageId();
-                    concatMessages.append(text).append("&&");
+                    concatMessages.append(m).append("&&");
                     curBatchSize += 1;
                     if (batchNumber == 100) {
                         try {
@@ -107,43 +103,32 @@ public class UDPSender extends Thread{
 
     private void combineMessagesByReceiver() {
         for (Host h: processManager.getHostsList()) {
-            List<LightMessage> messagesToSend = messagesByReceiver.get(h.getId());
+            List<String> messagesToSend = messagesByReceiver.get(h.getId());
             synchronized (messagesToSend) {
                 synchronized (stubbornMessagesBeb) {
                     int next = nextBebIndex.get(h.getId());
-                    while (messagesToSend.size() < 100) {
+                    while (messagesToSend.size() < throughput) {
                         if (stubbornMessagesBeb.size() <= next) {
                             break;
                         }
-                        messagesToSend.add(stubbornMessagesBeb.get(next));
+                        messagesToSend.add(stubbornMessagesBeb.get(next).getText());
                         next += 1;
                         nextBebIndex.put(h.getId(), next);
                     }
-                }
-                int next = nextUrbIndex.get(h.getId());
-                while (messagesToSend.size() < 100) {
-                    if (next > desiredLastUrb) {
-                        break;
-                    }
-                    messagesToSend.add(new LightMessage(processManager.getHost().getId(), Integer.toString(next), next));
-                    next += 1;
-                    nextUrbIndex.put(h.getId(), next);
                 }
             }
         }
     }
 
-    public void addBebMessageToStubbornList(LightMessage m) {
-        synchronized (stubbornMessagesBeb) {
-            stubbornMessagesBeb.add(m);
-        }
-    }
-    public void deleteMessageFromStubbornList(Message message) {
+//    public void addBebMessageToStubbornList(LightMessage m) {
+//        synchronized (stubbornMessagesBeb) {
+//            stubbornMessagesBeb.add(m);
+//        }
+//    }
+    public void deleteMessageFromStubbornList(String message, int receiverId) {
 
-        String[] messageInfo = message.getText().split("@@");
-        LightMessage oneLightMessage = new LightMessage(Integer.parseInt(messageInfo[0]), messageInfo[1], Integer.parseInt(messageInfo[2]));
         synchronized (messagesByReceiver) {
-            messagesByReceiver.get(message.getReceiver().getId()).remove(oneLightMessage);
+            messagesByReceiver.get(receiverId).remove(message);
         }
     }
     public void UdpSend(String messageText, String receiverIp, int receiverPort) throws IOException {
@@ -153,13 +138,17 @@ public class UDPSender extends Thread{
 //        System.out.println("SEND " + messageText + " " + receiverPort);
     }
 
-    public void addUrbMessageToStubbornList(LightMessage m) {
-        desiredLastUrb = Math.max(desiredLastUrb, m.getMessageId());
-//        synchronized (stubbornMessagesUrb) {
-//            stubbornMessagesUrb.add(m);
-//        }
+
+    public void addBebMessageToStubbornList(LAMessage message) {
+        synchronized (stubbornMessagesBeb) {
+            stubbornMessagesBeb.add(message);
+        }
     }
 
-    public void addBebMessageToStubbornList(LAMessage m) {
+    public void addMessageToStubbornList(Message message) {
+        List<String> messages = messagesByReceiver.get(message.getReceiver().getId());
+        synchronized (messages) {
+            messages.add(message.getText());
+        }
     }
 }

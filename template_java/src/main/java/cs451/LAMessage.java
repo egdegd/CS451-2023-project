@@ -3,19 +3,21 @@ package cs451;
 import java.util.Objects;
 
 public class LAMessage {
-    private final Integer SenderId;
+    private final Integer senderId;
     private final String text;
 
     public LAMessage(Integer senderId, String text) {
-        SenderId = senderId;
+        this.senderId = senderId;
         this.text = text;
     }
 
-    public LAMessage(Game game) {
+    public LAMessage(Game game, Integer senderId) {
+        this.senderId = senderId;
+        this.text = game.getText();
     }
 
     public Integer getSenderId() {
-        return SenderId;
+        return senderId;
     }
 
     public String getText() {
@@ -32,9 +34,9 @@ public class LAMessage {
         LAMessage m = (LAMessage) o;
         return
                 Objects.equals(text, m.getText()) &&
-                        Objects.equals(SenderId, m.SenderId);
+                        Objects.equals(senderId, m.senderId);
     }
     public int hashCode() {
-        return (SenderId.toString() + '$' + text + '$').hashCode();
+        return (senderId.toString() + '$' + text + '$').hashCode();
     }
 }
