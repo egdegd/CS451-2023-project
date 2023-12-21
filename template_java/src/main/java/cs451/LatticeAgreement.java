@@ -7,14 +7,22 @@ import java.util.Set;
 public class LatticeAgreement {
     Set<Game> games = Collections.synchronizedSet(new HashSet<>());
     ProcessManager processManager;
-    int maxFaulty;
+    int majority;
     public LatticeAgreement(ProcessManager pm) {
         processManager = pm;
-        maxFaulty = (processManager.getHostsList().size() - 1) / 2;
+        if (processManager.getHostsList().size() % 2 == 0) {
+            majority = processManager.getHostsList().size() / 2;
+        } else {
+            majority = (processManager.getHostsList().size() - 1) / 2;
+        }
+
     }
-    public void propose(Set<Integer> proposal, int gameNumber) {
+    public boolean propose(Set<Integer> proposal, int gameNumber) {
         Game game;
         synchronized (games) {
+            if (games.stream().filter(it-> (it.active) && (!it.proposedValue.isEmpty())).count() > 10) {
+               return false;
+            }
             game = games.stream().filter(it->it.gameNumber == gameNumber).findAny().orElse(null);
             if (game == null) {
                 game = new Game(proposal, gameNumber);
@@ -26,6 +34,7 @@ public class LatticeAgreement {
         LAMessage m = new LAMessage(game, processManager.getHost().getId());
 //        System.out.println("Propose " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
         processManager.bestEffortBroadCast(m);
+        return true;
     }
     public void receiveAck(int gameNumber, int proposalNumber) {
 //        TODO: replace list by hashset by number of the game?
@@ -72,15 +81,11 @@ public class LatticeAgreement {
         }
         if (proposedValue.containsAll(game.acceptedValue)) {
 //            System.out.println("SendAck " + gameNumber + ' ' + game.acceptedValue + ' ' + proposalNumber + ' ' + senderHost.getId());
-            if (game.active) {
-                game.acceptedValue.addAll(proposedValue);
-            }
+            game.acceptedValue.addAll(proposedValue);
             sendAck(gameNumber, proposalNumber, senderHost);
         } else {
 //            System.out.println("SendNack " + gameNumber + ' ' + proposalNumber + ' ' + game.acceptedValue + ' ' + proposedValue + ' ' + senderHost.getId());
-            if (game.active) {
-                game.acceptedValue.addAll(proposedValue);
-            }
+            game.acceptedValue.addAll(proposedValue);
             Set<Integer> diff = new HashSet<>(game.acceptedValue);
             diff.removeAll(proposedValue);
             sendNack(gameNumber, proposalNumber, diff, senderHost);
@@ -119,7 +124,7 @@ public class LatticeAgreement {
             processManager.bestEffortBroadCast(m);
 //            System.out.println("NewPropose " + game.proposedValue + ' ' + game.gameNumber + ' ' + game.acceptedValue + ' ' + game.activeProposalNumber);
         }
-        if (game.active && game.ackCount >= maxFaulty + 1)
+        if (game.active && game.ackCount >= majority + 1)
         {
 //            System.out.println(maxFaulty + " " +  game.ackCount);
             decide(game);
@@ -128,8 +133,8 @@ public class LatticeAgreement {
     }
 
     public void decide(Game game) {
-        processManager.decide(game);
         game.active = false;
+        processManager.decide(game);
 //        System.out.println("DECIDE. GAME " + game.gameNumber + " VALUE " + game.proposedValue);
     }
 }

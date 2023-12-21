@@ -30,7 +30,7 @@ public class UDPReceiver extends Thread{
         System.out.println("Server Started. Listening for Clients on port " + port + "...");
         while (true) {
 //            TODO: increase bytes
-            byte[] receiveData = new byte[32000];
+            byte[] receiveData = new byte[64000];
             // Server waiting for clients message
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
             try {
