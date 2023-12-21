@@ -18,13 +18,16 @@ public class Main {
 
         //write/flush output file if necessary
         System.out.println("Writing output.");
-        synchronized (processManager.logs) {
-            for (String line : processManager.logs) {
-                if (line == null) break;
-                writer.write(line + "\n");
+        try {
+            synchronized (processManager.logs) {
+                for (String line : processManager.logs) {
+                    if (line == null) break;
+                    writer.write(line + "\n");
+                }
             }
-        }
-        writer.close();
+            writer.close();
+        } catch (Exception ignored) {}
+
     }
     static TimerTask writeLogs = new TimerTask() {
         public void run() {
